@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MangaList - مكتبتي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d14;--surface:#15151f;--card:#1c1c2a;--accent:#c084fc;--accent2:#a855f7;
+  --text:#e2e8f0;--muted:#6b7280;--border:#2a2a3a;--red:#ef4444;--green:#22c55e;
+}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans Arabic',sans-serif;min-height:100vh;direction:rtl}
+
+#lock-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+.lock-logo{font-family:'Bebas Neue',cursive;font-size:56px;color:var(--accent);letter-spacing:6px;direction:ltr}
+.lock-sub{color:var(--muted);font-size:15px}
+#pin-dots{display:flex;gap:14px;direction:ltr}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);transition:all .2s}
+.dot.filled{background:var(--accent);border-color:var(--accent);box-shadow:0 0 12px rgba(192,132,252,0.5)}
+#pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:240px}
+.pin-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:18px;border-radius:14px;font-size:22px;cursor:pointer;transition:all .2s;font-family:inherit}
+.pin-btn:hover{background:var(--accent2);border-color:var(--accent)}
+.pin-btn:active{transform:scale(0.95)}
+.pin-btn.del{font-size:14px;color:var(--muted)}
+.lock-err{color:var(--red);font-size:13px;min-height:20px;text-align:center}
+
+#sync-indicator{position:fixed;top:16px;left:16px;display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--border);padding:6px 14px;border-radius:20px;font-size:12px;color:var(--muted);z-index:50;transition:all .3s}
+#sync-indicator.syncing{border-color:var(--accent);color:var(--accent)}
+#sync-indicator.synced{border-color:var(--green);color:var(--green)}
+#sync-indicator.error{border-color:var(--red);color:var(--red)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.sync-dot.spin{animation:spin 1s linear infinite;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;background:none;width:10px;height:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#app{display:none;flex-direction:column;min-height:100vh}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.logo{font-family:'Bebas Neue',cursive;font-size:30px;color:var(--accent);letter-spacing:3px;direction:ltr}
+.nav-tabs{display:flex;gap:4px}
+.tab{background:none;border:none;color:var(--muted);padding:9px 18px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:14px;transition:all .2s}
+.tab.active{background:var(--accent2);color:#fff}
+.tab:hover:not(.active){background:var(--card);color:var(--text)}
+main{flex:1;padding:24px;max-width:1200px;margin:0 auto;width:100%}
+
+.search-bar{display:flex;gap:10px;margin-bottom:24px}
+.search-bar input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);padding:13px 18px;border-radius:12px;font-size:15px;font-family:inherit;outline:none;direction:rtl;transition:border-color .2s}
+.search-bar input:focus{border-color:var(--accent)}
+.search-bar button{background:var(--accent2);border:none;color:#fff;padding:13px 22px;border-radius:12px;cursor:pointer;font-size:14px;font-family:inherit}
+.search-bar button:hover{opacity:0.85}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center}
+.stat-num{font-size:32px;font-weight:700;color:var(--accent)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:6px}
+.section-title{font-size:18px;font-weight:500;margin-bottom:16px;color:var(--accent);border-right:3px solid var(--accent);padding-right:10px}
+
+.manga-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:18px;margin-bottom:36px}
+.manga-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .25s;position:relative}
+.manga-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 32px rgba(168,85,247,0.2)}
+.manga-thumb{width:100%;height:210px;object-fit:cover;display:block}
+.manga-thumb-placeholder{width:100%;height:210px;display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,var(--surface),var(--border))}
+.manga-info{padding:12px}
+.manga-title{font-size:13px;font-weight:500;margin-bottom:5px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.manga-meta{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:3px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-manga{background:#1e3a5f;color:#60a5fa}
+.badge-manhwa{background:#2d1a3f;color:#c084fc}
+.badge-manhua{background:#1a3320;color:#4ade80}
+.status-badge{position:absolute;top:8px;right:8px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.s-reading{background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
+.s-done{background:rgba(96,165,250,0.2);color:#60a5fa;border:1px solid rgba(96,165,250,0.3)}
+.s-plan{background:rgba(192,132,252,0.2);color:#c084fc;border:1px solid rgba(192,132,252,0.3)}
+.s-drop{background:rgba(248,113,113,0.2);color:#f87171;border:1px solid rgba(248,113,113,0.3)}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px}
+.card-actions{display:flex;gap:6px;padding:0 12px 12px}
+.act-btn{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:6px 4px;border-radius:8px;cursor:pointer;font-size:11px;font-family:inherit;transition:all .2s}
+.act-btn:hover{border-color:var(--accent);color:var(--accent)}
+.delete-btn{background:none;border:1px solid transparent;color:var(--red);cursor:pointer;font-size:11px;font-family:inherit;padding:6px 10px;border-radius:8px;transition:all .2s}
+.delete-btn:hover{border-color:var(--red);background:rgba(239,68,68,0.1)}
+
+.filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filter-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .2s}
+.filter-btn.active{background:var(--accent2);border-color:var(--accent);color:#fff}
+.filter-btn:hover:not(.active){border-color:var(--muted);color:var(--text)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;width:100%;max-width:480px;direction:rtl;max-height:90vh;overflow-y:auto}
+.modal h2{margin-bottom:22px;color:var(--accent);font-size:20px}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}
+.form-group input,.form-group select{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:10px;font-family:inherit;font-size:14px;outline:none;direction:rtl;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group select option{background:var(--card);color:var(--text)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.modal-btns{display:flex;gap:10px;margin-top:24px}
+.btn-primary{background:var(--accent2);border:none;color:#fff;padding:12px 24px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px;flex:1;transition:opacity .2s}
+.btn-primary:hover{opacity:0.85}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--muted);padding:12px 24px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px;transition:all .2s}
+.btn-ghost:hover{border-color:var(--text);color:var(--text)}
+
+.add-fab{position:fixed;bottom:28px;left:28px;background:var(--accent2);border:none;color:#fff;width:56px;height:56px;border-radius:50%;font-size:26px;cursor:pointer;box-shadow:0 4px 24px rgba(168,85,247,0.5);z-index:50;transition:transform .2s}
+.add-fab:hover{transform:scale(1.1)}
+
+.settings-section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:20px}
+.settings-section h3{color:var(--accent);margin-bottom:18px;font-size:15px}
+
+.notification{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);color:var(--text);padding:12px 24px;border-radius:12px;z-index:9999;font-size:14px;animation:notif .3s ease}
+@keyframes notif{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:52px;margin-bottom:14px}
+.logout-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .2s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+@media(max-width:600px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .nav-tabs .tab{padding:8px 10px;font-size:12px}
+  header{padding:12px 14px}
+  main{padding:14px}
+  .form-row{grid-template-columns:1fr}
+  #sync-indicator{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="sync-indicator">
+  <div class="sync-dot" id="sync-dot"></div>
+  <span id="sync-text">غير متصل</span>
+</div>
+
+<div id="lock-screen">
+  <div class="lock-logo">MANGALIST</div>
+  <div class="lock-sub">مكتبتك الشخصية</div>
+  <div id="pin-dots">
+    <div class="dot" id="d0"></div><div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div><div class="dot" id="d3"></div>
+  </div>
+  <div id="pin-pad">
+    <button class="pin-btn" onclick="pinPress(1)">1</button>
+    <button class="pin-btn" onclick="pinPress(2)">2</button>
+    <button class="pin-btn" onclick="pinPress(3)">3</button>
+    <button class="pin-btn" onclick="pinPress(4)">4</button>
+    <button class="pin-btn" onclick="pinPress(5)">5</button>
+    <button class="pin-btn" onclick="pinPress(6)">6</button>
+    <button class="pin-btn" onclick="pinPress(7)">7</button>
+    <button class="pin-btn" onclick="pinPress(8)">8</button>
+    <button class="pin-btn" onclick="pinPress(9)">9</button>
+    <button class="pin-btn del" onclick="pinDel()">مسح</button>
+    <button class="pin-btn" onclick="pinPress(0)">0</button>
+    <button class="pin-btn del" onclick="pinClear()">✕</button>
+  </div>
+  <div class="lock-err" id="pin-err"></div>
+  <div style="color:var(--muted);font-size:12px;margin-top:6px">الرقم الافتراضي: 1234</div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="logo">MANGALIST</div>
+    <div class="nav-tabs">
+      <button class="tab active" onclick="showPage('stats',this)">إحصائيات</button>
+      <button class="tab" onclick="showPage('library',this)">المكتبة</button>
+      <button class="tab" onclick="showPage('settings',this)">الإعدادات</button>
+    </div>
+    <button class="logout-btn" onclick="logout()">خروج</button>
+  </header>
+  <main>
+    <div id="page-stats">
+      <div class="stats-row" id="stats-grid"></div>
+      <div class="section-title">تقرأها الحين</div>
+      <div class="manga-grid" id="currently-reading"></div>
+      <div class="section-title">آخر المضافة</div>
+      <div class="manga-grid" id="recent-added"></div>
+    </div>
+    <div id="page-library" style="display:none">
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="ابحث في مكتبتك..." oninput="renderLibrary()"/>
+        <button onclick="showAddModal()">+ أضف</button>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" onclick="setFilter('all',this)">الكل</button>
+        <button class="filter-btn" onclick="setFilter('reading',this)">يُقرأ</button>
+        <button class="filter-btn" onclick="setFilter('done',this)">مكتمل</button>
+        <button class="filter-btn" onclick="setFilter('plan',this)">مخطط</button>
+        <button class="filter-btn" onclick="setFilter('drop',this)">متوقف</button>
+        <button class="filter-btn" onclick="setFilter('manga',this)">مانجا</button>
+        <button class="filter-btn" onclick="setFilter('manhwa',this)">مانهوا</button>
+        <button class="filter-btn" onclick="setFilter('manhua',this)">مانهوا صينية</button>
+      </div>
+      <div class="manga-grid" id="library-grid"></div>
+    </div>
+    <div id="page-settings" style="display:none">
+      <div class="settings-section">
+        <h3>تغيير رقم السر</h3>
+        <div class="form-row">
+          <div class="form-group"><label>الرقم الحالي</label><input type="password" id="old-pin" maxlength="4" placeholder="****"/></div>
+          <div class="form-group"><label>الرقم الجديد</label><input type="password" id="new-pin" maxlength="4" placeholder="****"/></div>
+        </div>
+        <button class="btn-primary" onclick="changePin()" style="flex:none;width:auto;padding:11px 28px">حفظ الرقم</button>
+      </div>
+      <div class="settings-section">
+        <h3>حالة المزامنة ☁️</h3>
+        <div id="sync-status-detail" style="font-size:14px;color:var(--muted)">جاري التحقق...</div>
+      </div>
+      <div class="settings-section">
+        <h3>إحصائيات مفصلة</h3>
+        <div id="detailed-stats"></div>
+      </div>
+      <div class="settings-section" style="border-color:#3f1a1a">
+        <h3 style="color:var(--red)">منطقة الخطر</h3>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:14px">حذف جميع البيانات من السحابة بشكل نهائي</p>
+        <button class="btn-ghost" style="border-color:var(--red);color:var(--red)" onclick="clearAll()">حذف كل البيانات</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="add-modal" style="display:none" class="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <h2 id="modal-title">إضافة مانجا جديدة</h2>
+    <div class="form-group"><label>الاسم</label><input type="text" id="m-title" placeholder="اكتب الاسم..."/></div>
+    <div class="form-row">
+      <div class="form-group"><label>النوع</label>
+        <select id="m-type">
+          <option value="manga">مانجا يابانية</option>
+          <option value="manhwa">مانهوا كورية</option>
+          <option value="manhua">مانهوا صينية</option>
+        </select>
+      </div>
+      <div class="form-group"><label>الحالة</label>
+        <select id="m-status">
+          <option value="reading">يُقرأ الحين</option>
+          <option value="plan">مخطط أقرأه</option>
+          <option value="done">مكتمل</option>
+          <option value="drop">متوقف</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>الفصل الحالي</label><input type="number" id="m-current" placeholder="0" min="0"/></div>
+      <div class="form-group"><label>إجمالي الفصول</label><input type="number" id="m-total" placeholder="؟" min="0"/></div>
+    </div>
+    <div class="form-group"><label>التقييم (من 10)</label><input type="number" id="m-score" placeholder="مثال: 8.5" min="0" max="10" step="0.5"/></div>
+    <div class="form-group"><label>رابط الغلاف (اختياري)</label><input type="text" id="m-cover" placeholder="https://..."/></div>
+    <div class="form-group"><label>ملاحظات</label><input type="text" id="m-notes" placeholder="أي ملاحظات..."/></div>
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="saveManga()">حفظ</button>
+      <button class="btn-ghost" onclick="closeModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<button class="add-fab" onclick="showAddModal()">+</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDKYghtbnO2J-WfbtD6Iz7j-wKf_Qr00QA",
+  authDomain: "mangalist-7448a.firebaseapp.com",
+  projectId: "mangalist-7448a",
+  storageBucket: "mangalist-7448a.firebasestorage.app",
+  messagingSenderId: "901886238323",
+  appId: "1:901886238323:web:f475f03eca8c532904d406"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const fsdb = getFirestore(firebaseApp);
+const COLLECTION = "manga";
+const PIN_KEY = "mangalist_pin_v1";
+
+let localDB = [];
+let editId = null;
+let currentFilter = "all";
+let unsubscribe = null;
+
+function setSyncState(state, text) {
+  const ind = document.getElementById("sync-indicator");
+  const dot = document.getElementById("sync-dot");
+  const txt = document.getElementById("sync-text");
+  ind.className = state;
+  ind.id = "sync-indicator";
+  dot.className = "sync-dot" + (state === "syncing" ? " spin" : "");
+  txt.textContent = text;
+  const detail = document.getElementById("sync-status-detail");
+  if (detail) {
+    if (state === "synced") detail.innerHTML = `<span style="color:var(--green)">✓ متصل بـ Firebase — بياناتك تتزامن تلقائياً على كل أجهزتك</span>`;
+    else if (state === "error") detail.innerHTML = `<span style="color:var(--red)">✕ خطأ في الاتصال بالسحابة</span>`;
+    else detail.innerHTML = `<span style="color:var(--accent)">⟳ جاري المزامنة...</span>`;
+  }
+}
+
+function startListener() {
+  setSyncState("syncing", "يتزامن...");
+  unsubscribe = onSnapshot(collection(fsdb, COLLECTION), (snap) => {
+    localDB = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setSyncState("synced", "متزامن ☁️");
+    renderAll();
+    if (document.getElementById("page-library").style.display !== "none") renderLibrary();
+    if (document.getElementById("page-settings").style.display !== "none") renderDetailedStats();
+  }, (err) => {
+    console.error(err);
+    setSyncState("error", "خطأ في الاتصال");
+  });
+}
+
+function getPin() { return localStorage.getItem(PIN_KEY) || "1234"; }
+let pinInput = "";
+
+window.pinPress = function(n) {
+  if (pinInput.length >= 4) return;
+  pinInput += n; updateDots();
+  if (pinInput.length === 4) setTimeout(checkPin, 250);
+};
+window.pinDel = function() { pinInput = pinInput.slice(0, -1); updateDots(); };
+window.pinClear = function() { pinInput = ""; updateDots(); };
+
+function updateDots() {
+  for (let i = 0; i < 4; i++)
+    document.getElementById("d" + i).classList.toggle("filled", i < pinInput.length);
+}
+
+function checkPin() {
+  if (pinInput === getPin()) {
+    document.getElementById("lock-screen").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    startListener();
+  } else {
+    document.getElementById("pin-err").textContent = "رقم السر غير صحيح";
+    for (let i = 0; i < 4; i++) document.getElementById("d" + i).style.background = "var(--red)";
+    setTimeout(() => {
+      window.pinClear();
+      for (let i = 0; i < 4; i++) document.getElementById("d" + i).style.background = "";
+      document.getElementById("pin-err").textContent = "";
+    }, 700);
+  }
+}
+
+window.logout = function() {
+  if (unsubscribe) unsubscribe();
+  document.getElementById("app").style.display = "none";
+  document.getElementById("lock-screen").style.display = "flex";
+  window.pinClear();
+};
+
+window.showPage = function(page, btn) {
+  ["stats", "library", "settings"].forEach(p =>
+    document.getElementById("page-" + p).style.display = "none"
+  );
+  document.getElementById("page-" + page).style.display = "block";
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  if (page === "stats") renderStats();
+  if (page === "library") renderLibrary();
+  if (page === "settings") renderDetailedStats();
+};
+
+function statusLabel(s) { return { reading: "يُقرأ", done: "مكتمل", plan: "مخطط", drop: "متوقف" }[s] || s; }
+function statusClass(s) { return { reading: "s-reading", done: "s-done", plan: "s-plan", drop: "s-drop" }[s] || "s-plan"; }
+function typeLabel(t) { return { manga: "مانجا", manhwa: "مانهوا", manhua: "مانهوا صينية" }[t] || t; }
+function typeBadge(t) { return { manga: "badge-manga", manhwa: "badge-manhwa", manhua: "badge-manhua" }[t] || ""; }
+
+function makeMangaCard(m, showActions = false) {
+  const prog = m.total > 0 ? Math.round((m.current / m.total) * 100) : 0;
+  const imgHtml = m.cover
+    ? `<img src="${m.cover}" class="manga-thumb" onerror="this.outerHTML='<div class=manga-thumb-placeholder>📖</div>'"/>`
+    : `<div class="manga-thumb-placeholder">📖</div>`;
+  return `<div class="manga-card" onclick="openEdit('${m.id}')">
+    ${imgHtml}
+    <div class="status-badge ${statusClass(m.status)}">${statusLabel(m.status)}</div>
+    <div class="manga-info">
+      <div class="manga-title">${m.title}</div>
+      <div class="manga-meta">
+        <span class="badge ${typeBadge(m.type)}">${typeLabel(m.type)}</span>
+        ${m.score ? `<span>⭐${m.score}</span>` : ""}
+      </div>
+      <div class="manga-meta" style="margin-top:4px">${m.current || 0}${m.total ? " / " + m.total : ""} فصل</div>
+      ${m.total > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>` : ""}
+      ${m.notes ? `<div class="manga-meta" style="margin-top:5px;font-style:italic">${m.notes}</div>` : ""}
+    </div>
+    ${showActions ? `<div class="card-actions">
+      <button class="act-btn" onclick="event.stopPropagation();quickStatus('${m.id}','reading')">يُقرأ</button>
+      <button class="act-btn" onclick="event.stopPropagation();quickStatus('${m.id}','done')">مكتمل</button>
+      <button class="delete-btn" onclick="event.stopPropagation();deleteManga('${m.id}')">حذف</button>
+    </div>` : ""}
+  </div>`;
+}
+
+function renderStats() {
+  const total = localDB.length;
+  const reading = localDB.filter(m => m.status === "reading").length;
+  const done = localDB.filter(m => m.status === "done").length;
+  const chapters = localDB.reduce((s, m) => s + (parseInt(m.current) || 0), 0);
+  document.getElementById("stats-grid").innerHTML = `
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">إجمالي</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#4ade80">${reading}</div><div class="stat-label">يُقرأ الحين</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#60a5fa">${done}</div><div class="stat-label">مكتمل</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#facc15">${chapters}</div><div class="stat-label">فصل مقروء</div></div>
+  `;
+  const cr = localDB.filter(m => m.status === "reading").slice(0, 6);
+  document.getElementById("currently-reading").innerHTML = cr.length
+    ? cr.map(m => makeMangaCard(m)).join("")
+    : `<div class="empty-state"><div class="empty-icon">📚</div><div>ما عندك مانجا تقرأها الحين</div></div>`;
+  const recent = [...localDB].sort((a, b) => b.addedAt - a.addedAt).slice(0, 6);
+  document.getElementById("recent-added").innerHTML = recent.length
+    ? recent.map(m => makeMangaCard(m)).join("")
+    : `<div class="empty-state"><div class="empty-icon">✨</div><div>أضف أول مانجا في مكتبتك!</div></div>`;
+}
+
+window.setFilter = function(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderLibrary();
+};
+
+function renderLibrary() {
+  const q = (document.getElementById("search-input").value || "").toLowerCase();
+  const list = localDB.filter(m => {
+    const matchQ = !q || m.title.toLowerCase().includes(q);
+    let matchF = true;
+    if (["reading", "done", "plan", "drop"].includes(currentFilter)) matchF = m.status === currentFilter;
+    else if (["manga", "manhwa", "manhua"].includes(currentFilter)) matchF = m.type === currentFilter;
+    return matchQ && matchF;
+  });
+  document.getElementById("library-grid").innerHTML = list.length
+    ? list.map(m => makeMangaCard(m, true)).join("")
+    : `<div class="empty-state"><div class="empty-icon">🔍</div><div>${q ? "ما لقينا نتائج" : "المكتبة فاضية!"}</div></div>`;
+}
+
+function renderDetailedStats() {
+  const scores = localDB.filter(m => m.score && m.score > 0);
+  const avg = scores.length
+    ? (scores.reduce((s, m) => s + parseFloat(m.score), 0) / scores.length).toFixed(1)
+    : "-";
+  document.getElementById("detailed-stats").innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:14px;row-gap:12px">
+      <div style="color:var(--muted)">مانجا يابانية</div><div>${localDB.filter(m => m.type === "manga").length}</div>
+      <div style="color:var(--muted)">مانهوا كورية</div><div>${localDB.filter(m => m.type === "manhwa").length}</div>
+      <div style="color:var(--muted)">مانهوا صينية</div><div>${localDB.filter(m => m.type === "manhua").length}</div>
+      <div style="color:var(--muted)">متوسط التقييم</div><div>⭐ ${avg}</div>
+      <div style="color:var(--muted)">متوقف</div><div>${localDB.filter(m => m.status === "drop").length}</div>
+      <div style="color:var(--muted)">مخطط</div><div>${localDB.filter(m => m.status === "plan").length}</div>
+    </div>
+  `;
+  setSyncState("synced", "متزامن ☁️");
+}
+
+function renderAll() { renderStats(); }
+
+window.showAddModal = function(id = null) {
+  editId = id;
+  const m = id ? localDB.find(x => x.id === id) : null;
+  document.getElementById("modal-title").textContent = id ? "تعديل" : "إضافة مانجا جديدة";
+  document.getElementById("m-title").value = m ? m.title : "";
+  document.getElementById("m-type").value = m ? m.type : "manga";
+  document.getElementById("m-status").value = m ? m.status : "reading";
+  document.getElementById("m-current").value = m ? m.current : "";
+  document.getElementById("m-total").value = m ? m.total : "";
+  document.getElementById("m-score").value = m ? m.score : "";
+  document.getElementById("m-cover").value = m ? m.cover : "";
+  document.getElementById("m-notes").value = m ? m.notes : "";
+  document.getElementById("add-modal").style.display = "flex";
+  setTimeout(() => document.getElementById("m-title").focus(), 100);
+};
+
+window.openEdit = function(id) { window.showAddModal(id); };
+window.closeModal = function() { document.getElementById("add-modal").style.display = "none"; editId = null; };
+window.closeModalOutside = function(e) { if (e.target === document.getElementById("add-modal")) window.closeModal(); };
+
+window.saveManga = async function() {
+  const title = document.getElementById("m-title").value.trim();
+  if (!title) { alert("اكتب اسم المانجا"); return; }
+  setSyncState("syncing", "يحفظ...");
+  const id = editId || ("manga_" + Date.now());
+  const existing = editId ? localDB.find(x => x.id === editId) : null;
+  const m = {
+    title,
+    type: document.getElementById("m-type").value,
+    status: document.getElementById("m-status").value,
+    current: parseInt(document.getElementById("m-current").value) || 0,
+    total: parseInt(document.getElementById("m-total").value) || 0,
+    score: parseFloat(document.getElementById("m-score").value) || 0,
+    cover: document.getElementById("m-cover").value.trim(),
+    notes: document.getElementById("m-notes").value.trim(),
+    addedAt: existing ? existing.addedAt : Date.now()
+  };
+  try {
+    await setDoc(doc(fsdb, COLLECTION, id), m);
+    window.closeModal();
+    notify(editId ? "تم التعديل ✓" : "تمت الإضافة ✓");
+  } catch (e) {
+    setSyncState("error", "خطأ في الحفظ");
+    notify("خطأ في الحفظ ✕");
+    console.error(e);
+  }
+};
+
+window.deleteManga = async function(id) {
+  if (!confirm("تحذف هذه المانجا؟")) return;
+  setSyncState("syncing", "يحذف...");
+  try {
+    await deleteDoc(doc(fsdb, COLLECTION, id));
+    notify("تم الحذف");
+  } catch (e) {
+    notify("خطأ في الحذف ✕");
+  }
+};
+
+window.quickStatus = async function(id, status) {
+  const m = localDB.find(x => x.id === id);
+  if (!m) return;
+  try {
+    await setDoc(doc(fsdb, COLLECTION, id), { ...m, status }, { merge: true });
+  } catch (e) {
+    notify("خطأ ✕");
+  }
+};
+
+window.changePin = function() {
+  const old = document.getElementById("old-pin").value;
+  const nw = document.getElementById("new-pin").value;
+  if (old !== getPin()) { notify("الرقم الحالي غير صحيح ✕"); return; }
+  if (nw.length < 4) { notify("الرقم لازم يكون 4 أرقام"); return; }
+  localStorage.setItem(PIN_KEY, nw);
+  notify("تم تغيير الرقم ✓");
+  document.getElementById("old-pin").value = "";
+  document.getElementById("new-pin").value = "";
+};
+
+window.clearAll = async function() {
+  if (!confirm("تمسح كل البيانات من السحابة؟ لا يرجع!")) return;
+  setSyncState("syncing", "يمسح...");
+  try {
+    const snap = await getDocs(collection(fsdb, COLLECTION));
+    const batch = writeBatch(fsdb);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    notify("تم مسح كل البيانات");
+  } catch (e) {
+    notify("خطأ في المسح ✕");
+  }
+};
+
+function notify(msg) {
+  const n = document.createElement("div");
+  n.className = "notification";
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2200);
+}
+
+document.addEventListener("keydown", e => {
+  if (document.getElementById("lock-screen").style.display !== "none") {
+    if (e.key >= "0" && e.key <= "9") window.pinPress(parseInt(e.key));
+    if (e.key === "Backspace") window.pinDel();
+    if (e.key === "Escape") window.pinClear();
+  }
+  if (e.key === "Escape") window.closeModal();
+});
+</script>
+</body>
+</html>
